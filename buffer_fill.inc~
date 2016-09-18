@@ -1,0 +1,127 @@
+
+make:
+ db '#! /bin/bash',0ah
+ db 'make &> /tmp/aedit.tmp.2',0ah
+make_end:
+
+spell:
+ db '#! /bin/bash',0ah
+ db 'if test -e ispell ; then',0ah
+ db 'ispell $1 ;',0ah
+ db 'else',0ah
+ db 'aspell -c $1',0ah
+ db 'fi',0ah
+spell_end:
+
+compar:
+ db '#! /bin/bash',0ah
+ db 'fldiff=$(which fldiff)',0ah
+ db 'if [ -x "$fldiff" ]; then',0ah
+ db '# compare two files and optionally make changes',0ah
+ db 'fldiff $1 $2',0ah
+ db 'exit',0ah
+ db 'fi',0ah
+ db 'clear',0ah
+ db 'echo "program fldiff needed for compare"',0ah
+ db 'echo "press <enter key> to continue"',0ah
+ db 'read key',0ah
+compar_end:
+
+print:
+ db '#! /bin/bash',0ah
+ db '#>1 script',0ah
+ db '#  print - example print script',0ah
+ db '# INPUTS',0ah
+ db '#  $1 is base name of file to print.',0ah
+ db '# OUTPUT',0ah
+ db '#  printer is called, but edit file unouched.',0ah
+ db '# NOTES',0ah
+ db '# * file: a.f7  <- tied to function key f7',0ah
+ db '# *',0ah
+ db '# * This example script is configured for the HP 500',0ah
+ db '# * printer.  It does show how enscript can be used',0ah
+ db '# * with a menu program to print two pages side by',0ah
+ db '# * side.',0ah
+ db '#<',0ah
+ db '# * ----------------------------------------------',0ah
+ db '',0ah
+ db 'asmmenu $0',0ah
+ db 'ret=$?',0ah
+ db 'echo "button returned code "$ret',0ah
+ db 'echo "printing file "$1',0ah
+ db '',0ah
+ db 'if [ $ret = 11 ]; then',0ah
+ db '       # print bold without title',0ah
+ db '       enscript $1 --no-header -f Courier-Bold10 -M Letterdj -c ',0ah
+ db 'fi',0ah
+ db '',0ah
+ db 'if [ $ret = 21 ]; then',0ah
+ db '       # print big type without headers',0ah
+ db '       enscript $1 --no-header -f Courier-Bold12 -M Letterdj -c',0ah
+ db 'fi',0ah
+ db '',0ah
+ db 'if [ $ret = 31 ]; then',0ah
+ db '       # print  with title',0ah
+ db '       enscript $1 --fancy-header -f Courier-Bold10 -M Letterdj -c',0ah
+ db 'fi',0ah
+ db '',0ah
+ db 'if [ $ret = 12 ]; then',0ah
+ db '       # print bold without title',0ah
+ db '       enscript $1 --no-header -f Courier-Bold8 -M Letterdj -c -2r',0ah
+ db '       echo "2up"',0ah
+ db 'fi',0ah
+ db '',0ah
+ db 'if [ $ret = 22 ]; then',0ah
+ db '       # print bold without headers',0ah
+ db '       enscript $1 --no-header -f Courier-Bold10 -M Letterdj -c -2r',0ah
+ db '       echo "2upB"',0ah
+ db 'fi',0ah
+ db '',0ah
+ db 'if [ $ret = 32 ]; then',0ah
+ db '       # print bold with title',0ah
+ db '       enscript $1 --fancy-header -f Courier-Bold8 -M Letterdj -c -2r',0ah
+ db '       echo "2upT"',0ah
+ db 'fi',0ah
+ db '',0ah
+ db 'if [ $ret = 13 ]; then',0ah
+ db '       # print bold without headers',0ah
+ db '       enscript $1 --no-header -f Courier-Bold8 -M Letterdj -c -r',0ah
+ db '       echo "2upB"',0ah
+ db 'fi',0ah
+ db '',0ah
+ db 'if [ $ret = 23 ]; then',0ah
+ db '       # print bold without headers',0ah
+ db '       enscript $1 --no-header -f Courier-Bold10 -M Letterdj -c -r',0ah
+ db '       echo "2upB"',0ah
+ db 'fi',0ah
+ db '',0ah
+ db 'if [ $ret = 33 ]; then',0ah
+ db '       # print bold without headers',0ah
+ db '       enscript $1 --no-header -f Courier-Bold12 -M Letterdj -c -r',0ah
+ db '       echo "2upB"',0ah
+ db 'fi',0ah
+ db 'exit 0',0ah
+ db '#---------------------------------------------------',0ah
+ db '#menu definition follows',0ah
+ db '# return code grid 11 12 13',0ah
+ db '#                  21 22 23',0ah
+ db '#                  31 32 33',0ah
+ db 'buttonsize: 3,12',0ah
+ db 'clear',0ah
+ db 'header: ""',0ah
+ db 'header: "            Print format menu"',0ah
+ db 'header: ""',0ah
+ db 'header: " 1up-print     2up-print     landscape"',0ah
+ db '	1-up    	2-up    	small font',0ah
+ db '	90 columns	71 columns	xx columns',0ah
+ db '	65 rows 	62 rows 	xx rows',0ah
+ db '',0ah
+ db '	1-up    	2-up    	medium font',0ah
+ db '	74 columns	mini    	xx columns',0ah
+ db '	55 rows 	font    	xx rows',0ah
+ db '',0ah
+ db '	1-up+title	2-up+title	big font',0ah
+ db '	90 columns	71 columns	xx columns',0ah
+ db '	63 rows 	60 rows 	xx rows',0ah
+ db '',0ah
+print_end:

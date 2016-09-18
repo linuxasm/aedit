@@ -1,0 +1,695 @@
+;--------------------------------------
+; decode mouse button
+;  input:  esi = mouse table
+;          [mouse_col]
+; output: esi points at table (button text) entry
+;
+decode_mouse_button:
+;  mov	bh,[win_loc_col] ;starting column
+  mov	bh,1		;starting column for menu
+  mov	bl,[mouse_col]	;click point -> bl
+  xor	eax,eax
+dmb_10:
+  mov	edx,[esi]	;get process
+  add	esi,4		;move to button text
+  mov	ecx,esi		;save for exit
+dmb_15:
+  lodsb
+  cmp	al,8
+  ja	dmb_20		;jmp if ascii
+  cmp	al,0
+  je	dmb_exit	;exit if no match
+;  add	bh,al		;move column
+  inc	bh
+  jmp	dmb_10		;loop back to check next label
+dmb_20:
+  cmp	bh,bl		;are we at click
+  je	dmb_30		;jmp if click point found
+  inc	bh
+  jmp	short dmb_15
+;
+; we have found click column and process, go do it
+;
+dmb_30:
+  or	edx,edx
+  jz	dmb_exit	;exit if not entry  
+  mov	esi,ecx		;get pointer to label text  
+  call	edx
+dmb_exit:
+  ret
+
+;---------------------------------
+; look up mouse processing table
+;  input: [mouse_mode]
+; output: esi = table address
+;    
+get_mouse_table:  
+  xor	eax,eax
+  mov	al,[mouse_mode]
+  shl	eax,2
+  add	eax,mouse_tables-4
+  mov	esi,[eax]		;get table
+  ret
+;------------------------------------------
+
+;--------------------------------------------
+;  input:  edi = end of status line
+;
+write_status_line:
+  mov	ah,[status_line_row]
+  mov	al,1
+  call	move_cursor		;position cursor
+
+  mov	edx,edi
+  sub	edx,lib_buf		;compute length of line
+  mov	ecx,lib_buf
+  mov eax, 0x4			; system call 0x4 (write)
+  mov ebx, stdout		; file desc. is stdout
+  int 0x80
+  
+;;  mov	eax,[crt_cursor]
+;;  call	move_cursor
+  ret
+  
+;--------------------------------------
+; input: eax=binary
+;output: edi=data ptr
+;        ecx=length
+stuff_decimal:
+  push	edi
+  mov	edi,bakpath+8		;temp buffer
+  mov	byte [edi],0		;put zero at end of data
+  call	IntegerToAscii
+  mov	esi,edi			;get string begin
+  mov	ecx,bakpath+8		;get end of string
+  sub	ecx,edi			;compute length
+  pop	edi			;get storage point
+  inc	esi			;move to data
+  rep	movsb
+  ret
+    
+;------------------
+; make status line buttons
+;  input:  esi = control table pointer
+;
+make_buttons:
+  cld
+  mov	edi,lib_buf
+  xor	ecx,ecx		;column count
+  inc	ecx		;start with 1
+mb_10:
+  add	esi,4		;skip over process
+;
+; check if name present
+;
+mb_12:
+  lodsb
+  cmp	al,8
+  jb	mb_20		;jmp if end of name found
+  stosb
+  inc	ecx		;bump column
+  cmp	cl,[crt_columns]
+  je	mb_40		;jmp if at end of window
+  jmp	mb_12
+;
+; check if end of table
+;
+mb_20:
+  cmp	al,0
+  je	mb_40
+  call	select_color	;inserts space + colors, ecx unmodified
+  inc	ecx		;bump column
+  cmp	cl,[crt_columns]
+  je	mb_40		;jmp if end of window
+  jmp	mb_10		;go do next button
+;
+; end of table or window found
+;
+mb_40:
+  mov	al,0
+  call	select_color
+mb_fill:
+  cmp	ecx,[crt_columns]	;are we at edge
+  je	mb_50		;jmp if at edge
+  mov	al,' '
+  stosb
+  inc	ecx
+  jmp	short mb_fill
+
+mb_50:
+  mov	al,0
+  stosb				;put zero at end of status line
+;  call	truncate_status_line
+  call	write_status_line	;edi=end of line
+  ret    
+;---------------
+; al=code for color
+; insets one space using color 0
+; uses code in al to set color
+select_color:
+  push	ecx
+  push	esi
+  xor	ecx,ecx
+  mov	cl,al
+  push	ecx		;save code
+  mov	eax,[status_line_colors]
+  call	move_color
+  mov	al,' '
+;  rep	stosb
+  stosb
+  mov	eax,status_line_colors
+  pop	ecx			;get color code
+  shl	ecx,2			;make dword ptr
+  add	ecx,eax			;index into colors
+  mov	eax,[ecx]		;get color
+  call	 move_color
+  pop	esi
+  pop	ecx
+  ret
+;------------------------
+; input: none
+;
+display_status_line:
+  cld
+  call	clear_status_line
+
+  mov	ecx,[special_status_msg_ptr]	;check if special msg needed
+  jecxz dsl_05			;jmp if no special messages to display
+  mov	eax,[status_color2]	;get color (change to status_color)
+  mov	bh,[status_line_row]
+  mov	bl,1			;column 1
+  call	display_color_at	;display message
+  mov	dword [special_status_msg_ptr],0
+  mov	eax,normal_color+white_char+on_blue
+  call	set_color
+  jmp	short dsl_exit
+dsl_05:
+  cmp	byte [mouse_mode],0
+  jne	dsl_10
+;  call	keyboard_status_line
+  call	show_cmd_line
+  jmp	dsl_exit
+dsl_10:
+  call	get_mouse_table
+  call	make_buttons
+dsl_exit:
+  ret
+;-----------------------------------------------------------
+show_cmd_line:
+;do mode button
+  mov	esi,cmd_msg
+  cmp	[key_mode],byte 0
+  je	scl_mode
+  mov	esi,ovr_msg
+  cmp	[insert_overtype],byte 0
+  je	scl_mode
+  mov	esi,ins_msg
+scl_mode:
+  mov	edi,cl_mode
+  mov	ecx,3
+  rep	movsb
+;do macro button
+  mov	al,1	;normal color code
+  cmp	[macro_flag],byte 0
+  je	set_macro_color
+  mov	al,2
+set_macro_color:
+  mov	[macro_button_color_code],al
+;do block button
+  mov	al,1
+  cmp	[showblock],byte 0
+  je	set_block_color
+  mov	al,2
+set_block_color:
+  mov	[block_color_code],al
+;fill in line#
+  mov	edi,linenr_stuff
+  mov	eax,[cursor_linenr]  
+  mov	ecx,5
+  call	stuff_decimal		;stuff line number
+;fill in column
+  xor	eax,eax
+  mov	al,[crt_cursor]		;get column
+  sub	al,byte [win_loc_col]
+  add	eax,[crt_left_column]
+  mov	edi,column_stuff
+  mov	ecx,3
+  call	stuff_decimal		;stuff display column
+;fill in character hex
+  mov	esi,[editbuf_cursor_ptr]	;cursor pointer for editbuf
+  mov  al,byte [esi]		;get character
+  call	byte_to_hex
+  mov	[char_stuff],ax
+;set file number
+  mov	al,'1'
+  test	byte [win_type],1	;check if file1 or file2 active
+  jz	scl_08			;jmp if file1
+  mov	al,'2'
+scl_08:
+  mov	[file_number],al
+;stuff file name
+ mov edi,file_name_stuff
+ mov esi,file_path		;get pointer to filename
+;
+; find end of filename, (setup to show filename without full path)
+;
+scl_09:
+  lodsb
+  cmp	al,0
+  jne	scl_09			;loop till end of filename
+;
+; move back to beginning of filename
+;
+scl_09a:
+  cmp	esi,file_path
+  je	scl_10
+  dec	esi
+  cmp	byte [esi-1],'/'
+  je	scl_10			;jmp if at beginning of name
+  jmp	short scl_09a
+;
+; move filename without full path
+;
+scl_10:
+  lodsb
+  or al,al
+  jz scl_12			;jmp if end of name
+  stosb
+  jmp	scl_10			;loop till file name moved
+scl_12:
+  cmp	edi,file_name_end
+  je	scl_14
+  mov	al,' '
+  stosb
+  jmp	short scl_12
+scl_14:
+  mov	esi,cmd_line
+  call	make_buttons
+  ret
+
+
+  [section .data]
+
+cmd_msg	db	"CMD",0
+ins_msg	db	"INS",0
+ovr_msg	db	"OVR",0
+;mode_msg db	'mode  ',0
+
+; (#11#) database - menu tables ********************************
+
+mouse_tables:
+  dd	m1_menu
+  dd	m2_quit
+  dd	m3_window
+  dd	m4_jump
+  dd	m5_misc
+  dd	m6_edit
+  dd	m7_find
+  dd	m8_block
+  dd	m9_function
+;------------------------------------------
+cmd_line:
+  dd	0	;null process
+; db	null	;no text
+  db	1	;one space then color ->1
+;
+  dd	KeyIns	;needs to be toggle cmd/edit mode
+cl_mode:
+  db	'INS'	;start in insert
+macro_button_color_code:
+  db	1	;color for next button
+;
+  dd	macro_record_toggle	;macro record toggle
+  db	'MACRO'
+block_color_code:
+  db	1	;color for next button
+;
+  dd	mark_block	;block toggle
+  db	'BLOCK'
+  db	1	;color for next button
+;
+  dd	m1mode	;menu
+  db	'MENU'
+  db	1	;color for next button
+;
+  dd	m4mode	;jump menu (line#)
+  db	'line='
+linenr_stuff:
+  db '      '
+  db	1
+;
+  dd	0	;column
+  db	'column='
+column_stuff:
+  db '   '
+  db	1
+;
+  dd	m6_hex	;char hex
+  db	'char='
+char_stuff:
+  db '  '
+  db	1
+;
+  dd	m2mode	;file/quit menu
+  db	'file'
+file_number:
+  db 'x='
+file_name_stuff:
+  db '                                                                    '
+file_name_end:
+  db	0	;end of table
+
+
+;------------------------------------------
+m1_menu:
+  dd	0	;null process
+; db	null	;no name
+  db	1	;end of name, 1 space
+;
+  dd	m2mode	;Quit menu
+  db	'Quit'
+  db	1	;space
+;
+  dd	m3mode
+  db	'Window';window menu
+  db	1	;end of table
+;
+  dd	m4mode	;jump menu
+  db	'Jump'
+  db	1
+;
+  dd	m5mode	;misc menu
+  db	'Misc'
+  db	1
+;
+  dd	m6mode	;edit menu
+  db	'edit(Ins)'
+  db	1
+;
+  dd	m7mode	;find menu
+  db	'Find'
+  db	1
+;
+  dd	m8mode	;Block
+  db	'Block'
+  db	1
+;
+;  dd	m9mode	;Setup
+;  db	'Setup'
+;  db	1
+;
+  dd	m10mode	;help
+  db	'Help'
+  db	1
+;
+  dd	KeyPgUp		;pgup
+  db	'PGUP'
+  db	1
+;
+  dd	KeyPgDn		;pgdn
+  db	'PGDN'
+  db	0
+;---------------------------  
+  
+m2_quit:		;control table
+  dd	0	;null process
+; db	null	;no name
+  db	1	;end of name, 1 space
+;
+  dd	m1mode
+  db	'< back'
+  db	1
+;  
+  dd	m_abort		;abort (deZert)
+  db	'(Z)abort'	;QA
+  db	1
+;
+  dd	m_exit
+  db	'Exit'		;QE
+  db	1
+;
+  dd	m_newfile
+  db	'New-file'	;QI
+  db	1
+;
+  dd	m_update
+  db	'Update'	;QU
+  db	1 
+;
+  dd	m_write
+  db	'saVe-as'	;QW
+  db	0		;end of table
+  
+;-----------------------
+m3_window:		;control table
+  dd	0	;null process
+; db	null	;no name
+  db	1	;end of name, 1 space
+;
+  dd	m1mode
+  db	'<-back'
+  db	1
+;
+  dd	m3mode	;window
+  db	'Window-split'
+  db	1
+;
+  dd	m3_other
+  db	'Other_window'
+  db	0
+
+;-----------------------
+m4_jump:		;control table
+  dd	0	;null process
+; db	null	;no name
+  db	1	;end of name, 1 space
+;
+  dd	m1mode
+  db	'<back'
+  db	1
+;
+  dd	m4_line
+  db	'Line'
+  db	1
+;
+  dd	m4_top
+  db	'top'
+  db	1
+;
+  dd	m4_eof
+  db	'eof'
+  db	1
+;
+  dd	m4_tags1
+  db	'tag a'
+  db	1
+;
+  dd	m4_tags2
+  db	'tag b'
+  db	1
+;
+  dd	m4_tags3
+  db	'tag c'
+  db	1
+;
+  dd	m4_tags4
+  dB	'tag d'
+  db	1
+; 
+  dd	m4_tag1
+  db	'go a'
+  db	1
+;
+  dd	m4_tag2
+  db	'go b'
+  db	1
+;
+  dd	m4_tag3
+  db	'go c'
+  db	1
+;
+  dd	m4_tag4
+  db	'go d'
+  db	1
+;
+  dd	KeyPgUp
+  db	'pgup'
+  db	1
+;
+  dd	KeyPgDn
+  db	'pgdn'
+  db	0
+;-----------------------
+m5_misc:		;control table
+  dd	0	;null process
+; db	null	;no name
+  db	1	;end of name, 1 space
+;
+  dd	m1mode
+  db	'<-back'
+  db	1
+;
+  dd	m5_paragraph
+  db	'Paragraph'
+  db	1
+;
+  dd	m5_calc
+  db	'Calculator'
+  db	1
+;
+  dd	f_make
+  db	'F3-make'
+  db	1
+;
+;  dd	f_bug
+;  db	'F4-debug'
+;  db	1
+;
+  dd	key_f5
+  db	'F5'
+  db	1
+  
+;
+  dd	key_f6
+  db	'F6'
+  db	1
+  
+  dd	key_f7
+  db	'F7'
+  db	1
+  
+;  dd	key_f8
+;  db	'F8'
+;  db	1
+  
+;  dd	key_f9
+;  db	'F9'
+;  db	1
+  
+  dd	key_fa
+  db	'F10'
+  db	1
+  
+;  dd	key_fb
+;  db	'F11'
+;  db	1
+  
+;  dd	key_fc
+;  db	'F12'
+;  db	0
+  
+;-----------------------
+m6_edit:		;control table
+  dd	0	;null process
+; db	null	;no name
+  db	1	;end of name, 1 space
+;
+  dd	m1mode
+  db	'<-back'
+  db	1
+;
+  dd	m6_insert
+  db	'Insert mode'
+  db	1
+;
+  dd	m6_overtype
+  db	'Xovertype mode'
+  db	1
+;
+  dd	m6_hex
+  db	'hex edit'
+  db	0
+  
+;-----------------------
+m7_find:		;control table
+  dd	0	;null process
+; db	null	;no name
+  db	1	;end of name, 1 space
+;
+  dd	m1mode
+  db	'<-back'
+  db	1
+;
+  dd	find_forward		;key routine used so again works
+  db	'<+>forward find'
+  db	1
+;
+  dd	find_back		;key routine used so again works
+  db	'bacK find'
+  db	1
+;
+  dd	m7_replace
+  db	'Replace'
+  db	0
+  
+;-----------------------
+m8_block:		;control table
+  dd	0	;null process
+; db	null	;no name
+  db	1	;end of name, 1 space
+;
+  dd	m1mode
+  db	'<-back'
+  db	1
+;
+  dd	m8_markblock
+  db	'Block begin/end'
+  db	1
+;
+  dd	m8_dblock
+  db	'block Delete'
+  db	1
+;
+  dd	m8_getblock
+  db	'Get block'
+  db	1
+;
+  dd	m8_get
+  db	'Yank (get/insert) file'
+  db	0
+
+
+;-----------------------
+m9_function:	;control table
+  dd	0	;null process
+; db	null	;no name
+  db	1	;end of name, 1 space
+;
+  dd	m1mode	;
+  db	'<-back'
+  db	1
+;
+  dd	KeyHelp
+  db	'F1 help'
+  db	1
+;
+  dd	m1mode
+  db	'F2 todo'
+  db	1
+;
+  dd	f_make
+  db	'F3 make'
+  db	1
+;
+;  dd	f_bug
+;  db	'F4 debug'
+;  db	1
+;
+  dd	key_f5
+  db	'f5 spell'
+  db	1
+;
+  dd	key_f6
+  db	'F6 compare'
+  db	1
+;
+  dd	key_f7
+  db	'F7 print'
+  db	1
+;
+  dd	key_fa
+  db	'F10 exit'
+  db	0
+;
+   [section .text]
+;-----------------------

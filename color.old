@@ -1,0 +1,237 @@
+;--------------------------------------------------------
+  [section .data]
+;------------------
+vt100_color_str:
+  db	1bh,'['
+vcs_atr:
+  db	0,'m'
+  db	1bh,'[4'
+vcs1:
+  db	0
+  db	'm'
+  db	1bh,'[3'
+vcs2:
+  db	0
+  db	'm'
+  db	0
+
+;-- display section ------------
+;------------------------------------------------------------------------
+; colors = aaxxffbb  (aa-attribute ff-foreground  bb-background)
+;   30-black 31-red 32-green 33-brown 34-blue 35-purple 36-cyan 37-grey
+;   attributes 30-normal 31-bold 34-underscore 37-inverse
+norm_text_color	dd 30003734h ;used for inactive window
+;			     ;grey-foreground=7 blue-backgound=4 0=norm attr
+bold_edit_color	dd 31003734h ;used for active window in edit mode
+;			     ;grey-foreground=7 blue-backgound=4 0=bold attr
+bold_cmd_color	dd 31003334h ;used for active window in command mode
+;			     ;grey-foreground=7 blue-backgound=4 0=bold attr
+high_text_color	dd 31003634h ;used for highlighting block
+;			     ;grey-foreground=7 blue-backgound=4 0=inver attr
+asm_text_color	dd 31003234h ;used to highlight comments ";"
+;			     ;cyan-foreground=6 blue-backgound=4 0=norm attr
+status_color	dd 30003037h ;used for status line
+status_color1	dd 30003137h ;used for special data on status line
+status_color2	dd 31003331h ;used for error messags or macro record
+exit_screen_color dd 31003334h ;used for error messags on status line
+cursor_color	dd 30003137h
+;----------------------------------------------------------  
+  [section .text]
+;-------------------------------
+; input: eax = color (aa??ffbb) attribute,foreground,background
+;        bl = column
+;        bh = row
+;        cl = ascii char
+;
+display_char_at:
+  push	ecx
+  push	ebx
+  call	set_color
+  pop	eax
+  call	move_cursor
+  pop	ecx
+
+  cmp	cl,20h
+  jae	dca_2			;jmp if possible alpha
+  mov	cl,'?'
+dca_2:
+  cmp	cl,7eh
+  jbe	dca_4			;jmp if legal alpha
+  mov	cl,'?'
+dca_4:
+  mov	byte [char_out],cl
+  mov	ecx,char_out		;display data
+  mov eax, 0x4			; system call 0x4 (write)
+  mov ebx, stdout		; file desc. is stdout
+  mov	edx,1			;write one char
+  int 0x80
+
+  ret
+  
+;------------------------
+
+; input: edi = storage pointer
+color0:
+  mov	eax,[status_color]
+  call	move_color
+  ret
+
+; input: edi = storage ptr
+color1:
+  mov	eax,[status_color1]
+  call	move_color
+  ret
+;----------------------
+
+;sets text color for blocks and windows, this includes
+; highlighting for .asm comments also.
+;  inputs: [showblock] - 0 if no blocks active
+;          [ebp] - current display posn
+;          [edi] - storage ptr
+;          [blockbegin] - block start
+;          [blockend] - block end
+;          edx 0100,0000=use bold_text_color <- set by caller
+;              0001,0000=current attr = text_color <- set by program
+;              0002,0000=current attr = block_color <- set by program
+;              0004,0000=asm highlight
+;
+check_color:
+  cmp byte [showblock],0
+  je isb_no_blk			;jmp if no block
+  mov	esi,[editbuf_cursor_ptr]
+  cmp	esi,[blockbegin]	;check if block grows up or down
+  jb  growing_up
+; block is normal, gowing down, display from blockbegin to cursor
+  cmp	ebp,[blockbegin]
+  jb	isb_no_blk		;jmp if display infront of block
+  cmp	ebp,esi
+  ja	isb_no_blk		;jmp if beyond block
+  jmp	isb_in_blk
+growing_up:			;growing up, display cursor to blockbegin
+  cmp	ebp,esi
+  jb	isb_no_blk		;jmp if display infront of block
+  cmp	ebp,[blockbegin]
+  ja	isb_no_blk		;jmp if beyond block
+isb_in_blk:
+  test	edx,00020000h		;check if block attr active
+  jnz	isb_exita		;exit if in-block and attr set already
+  and	edx,0ff00ffffh		;clear other attributes flags
+  or	edx,00020000h
+;
+; move block attribute to buffer
+;
+  mov	eax,[high_text_color]
+  call	move_color
+isb_exita:
+  jmp	isb_exit
+
+isb_no_blk:
+  test	edx,00020000h
+  jz	isb_10			;jmp if not in blk and attr is not block
+  and	edx,0ff00ffffh		;clear block active flag and text active flg
+;
+; block attribute not active and not inside block - asm check
+;
+isb_10:
+  cmp	byte [show_asm],0
+  je	isb_20			;jmp if asm comments not active
+  mov	al,[ebp]		;get current char
+  test	edx,00040000h		;check if comment active
+  jz	isb_asm_no
+;
+; asm comments highlighted, wait for 0ah to disable
+;
+  cmp	al,0ah
+  jne	isb_exit
+  and	edx,0ff00ffffh		;clear block active flag and text active flg
+  jmp	isb_20			;go set normal attr
+;
+; block not active, asm comments not active, check for ':'
+;
+isb_asm_no:
+  cmp	al,[asm_comment_char]	;  ';'
+  jne	isb_20			;go check for normal color state
+  or	edx,00040000h		;set asm highlight active
+  mov	eax,[asm_text_color]
+  call	move_color
+  jmp	isb_exit
+isb_20:
+  test	edx,00010000h		;check if text color attribute active
+  jnz	isb_exit		;exit if text attribute set
+  or	edx,00010000h		;set text attribute
+;
+; move normal attribute to buffer
+;
+  mov	eax,[bold_edit_color]
+  cmp	byte [key_mode],1
+  je	isb_24			;jmp if in command mode
+  mov	eax,[bold_cmd_color]	;use edit color for non-command modes
+isb_24:
+  test	edx,01000000h
+  jnz	isb_30			;jmp if bold text needed
+  mov	eax,[norm_text_color]
+isb_30:
+  call	move_color
+isb_exit:
+  ret
+;----------------------------
+;
+color_cursor:
+  mov	eax,[cursor_color]	;get color (change to status_color)
+  mov	bx,[crt_cursor]  
+  mov	ecx,[editbuf_cursor_ptr]	;get ptr to data
+  mov	cl,[ecx]		;get char under cursor
+  cmp	cl,0ah
+  je	cc_x05			;jmp   if 0ah
+  cmp	cl,09h			;check if tab
+  jne	cc_x10
+cc_x05:
+  mov	cl,' '
+cc_x10:
+  call	display_char_at	;display message
+  ret  
+;---------------------------
+; input - eax = aaxxffbb  (aa-attribute ff-foreground  bb-background)
+;   30-black 31-red 32-green 33-brown 34-blue 35-purple 36-cyan 37-grey
+;   attributes 0-normal 1-bold 4-underscore 7-inverse
+;   (see /src/lib/vttest for color chart) menu > 11 - 4 - 2
+move_color:
+  mov	byte [vcs1],al
+  mov	byte [vcs2],ah
+  rol	eax,8
+  mov	byte [vcs_atr],al
+  mov	esi,vt100_color_str
+  cld
+  call	move_asciiz
+  ret
+
+;--------------------------
+; input - eax = aaxxffbb  (aa-attribute ff-foreground  bb-background)
+;   30-black 31-red 32-green 33-brown 34-blue 35-purple 36-cyan 37-grey
+;   attributes 0-normal 1-bold 4-underscore 7-inverse
+;   (see /src/lib/vttest for color chart) menu > 11 - 4 - 2
+;
+set_color:
+  mov	byte [vcs1],al
+  mov	byte [vcs2],ah
+  rol	eax,8
+  mov	byte [vcs_atr],al
+  mov	ecx,vt100_color_str
+  call	display_asciiz
+  ret  
+;-------------------------------
+; input: eax = color (aa??ffbb) attribute,foreground,background
+;        bl = column
+;        bh = row
+;       ecx = message ptr (asciiz)
+;
+display_color_at:
+  push	ecx
+  push	ebx
+  call	set_color
+  pop	eax
+  call	move_cursor
+  pop	ecx
+  call	display_asciiz
+  ret
+  

@@ -1,0 +1,286 @@
+;---------------------------------------------------------------
+  [section .data]
+bookmark_colors:
+	dd	normal_color+white_char+on_black	;spacer
+	dd	normal_color+blue_char+on_white	;bookmark button1
+	dd	normal_color+white_char+on_black	;bookmark button2
+
+book_spacer_root_color  dd normal_color+white_char+on_black
+book_but1_root_color dd bold_color+white_char+on_red
+book_but2_root_color dd bold_color+white_char+on_black
+;-------
+menu_button1_color	dd bold_color+black_char+on_white	;color 0
+menu_button2_color	dd bold_color+white_char+on_black	;color 1
+menu_spacer_color	dd normal_color+red_char+on_white	;color 2 (log button)
+
+;------------- body display colors ------------------------------
+
+
+dirclr           dd bold_color+white_char+on_black ;color of directories in list
+linkclr          dd normal_color+cyan_char+on_black ;color of symlinks in list
+selectclr        dd normal_color+blue_char+on_cyan ;color of select bar
+fileclr          dd normal_color+white_char+on_black ;normal window color, and list color
+execlr           dd normal_color+green_char+on_black ;green
+devclr           dd normal_color+yellow_char+on_black ;red
+miscclr          dd normal_color+cyan_char+on_black ;black
+
+dim_colors:
+		dd	bold_color+black_char+on_black
+		dd	bold_color+black_char+on_black
+		dd	bold_color+black_char+on_black
+		dd	bold_color+black_char+on_black
+		dd	bold_color+black_char+on_black
+		dd	bold_color+black_char+on_black
+		dd	bold_color+black_char+on_black
+
+;----------- status line colors ----------------------------------------
+status_line_hot_colors:
+		dd	bold_color+white_char+on_blue  ;spacer
+                dd	normal_color+black_char+on_white  ;button 1
+		dd	bold_color+underline+white_char+on_blue   ;message line
+status_line_dim_colors:
+		dd	bold_color+white_char+on_blue  ;spacer
+                dd	normal_color+black_char+on_white  ;button 1
+		dd	bold_color+underline+white_char+on_blue   ;message area
+ 
+command_line_hot_colors:
+		dd	bold_color+white_char+on_blue
+                dd	normal_color+black_char+on_white
+		dd	bold_color+red_char+on_white
+command_line_dim_colors:
+		dd	normal_color+white_char+on_blue
+		dd	normal_color+black_char+on_white
+		dd	bold_color+black_char+on_black
+
+cursor_blink	dd	normal_color+underline+blink+blue_char+on_red
+
+cpy_mov_colors	dd	normal_color+underline+black_char+on_white
+cpy_mov_cur_color dd	bold_color+blink+underline+reverse+black_char+on_red
+;-----------------------------------------------------------------
+normal_color	equ	80000000h
+bold_color	equ	40000000h
+underline	equ	20000000h
+blink		equ	10000000h
+reverse		equ	08000000h
+
+black_char	equ	30h	;builds 3330h
+red_char	equ	31h	;builds 3331h
+green_char	equ	32h
+yellow_char	equ	33h
+blue_char	equ	34h
+magenta_char	equ	35h
+cyan_char	equ	36h
+white_char	equ	37h
+
+on_black	equ	3000h	;builds '40'
+on_red		equ	3100h
+on_green	equ	3200h
+on_yellow	equ	3300h	;builds '43'
+on_blue		equ	3400h	;
+on_magenta	equ	3500h
+on_cyan		equ	3600h
+on_white	equ	3700h
+
+
+  [section .text]
+  extern str_move
+  extern crt_str
+;---------------------------------------
+;input: edx=colors
+;       edi=destination
+;output: edi points to zero at end of color string
+;
+copy_colors:
+  push	esi
+  push	edx
+  push	edi
+  call	build_color
+  mov	esi,color_buf
+  mov	ecx,edi		;get length
+  sub	ecx,esi		;compute len
+  dec	ecx
+  pop	edi
+  rep	movsb
+  pop	edx
+  pop	esi
+  ret
+;---------------------------------------
+; input: color codes in edx
+;
+show_color:
+  push	edi
+  call	build_color
+  push	esi
+  mov	ecx,color_buf
+  call	crt_str
+  pop	esi
+  pop	edi
+  ret
+;---------------------------------------
+build_color:
+  cld
+  mov	edi,color_buf
+  mov	al,1bh
+  stosb
+  mov	al,'['
+  stosb
+  push	edx
+  or	edx,edx
+  jns	sc_05
+  mov	al,'0'
+  stosb
+  mov	al,';'
+  stosb
+sc_05:
+  shl	edx,1
+  jns	sc_10
+  mov	al,'1'	;bold
+  stosb
+  mov	al,';'
+  stosb
+sc_10:
+  shl	edx,1
+  jns	sc_15
+  mov	al,'4'	;underline
+  stosb
+  mov	al,';'
+  stosb
+sc_15:
+  shl	edx,1
+  jns	sc_20
+  mov	al,'5'	;blink
+  stosb
+  mov	al,';'
+  stosb
+sc_20:
+  shl	edx,1
+  jns	sc_25
+  mov	al,'7'	;reverse video
+  stosb
+  mov	al,';'
+  stosb
+sc_25:
+  pop	edx
+  or	dl,dl
+  jz	sc_30
+  mov	al,'3'	;char color
+  stosb
+  mov	al,dl
+  stosb
+  mov	al,';'
+  stosb
+sc_30:
+  or	dh,dh
+  jz	sc_35
+  mov	al,'4'
+  stosb
+  mov	al,dh
+  stosb
+sc_35:
+  cmp	byte [edi-1],';'
+  jne	sc_40		;jmp if no ';' at end
+  dec	edi
+sc_40:
+  mov	al,'m'
+  stosb
+  mov	al,0
+  stosb
+  ret
+;-----------------------------------------------------
+;  copy_cursor - move cursor
+; INPUTS
+;     al = column (1-xx)
+;     ah = row    (1-xx)
+;     edi = destination for string
+; OUTPUT
+;    string moved to [edi]
+; NOTES
+;    source file crt_move.asm
+;    This function moves the cursor by sending vt100
+;    escape commands to crt.
+;<
+;  * ----------------------------------------------
+;*******
+  global copy_cursor
+copy_cursor:
+  push	esi
+  push	ebx
+  push	ecx
+  push	edx
+  push	edi
+  push	eax
+  mov	word [vt_row],'00'
+  mov	word [vt_column],'00'
+  mov	edi,vt_column+2
+  call	quick_ascii
+  pop	eax
+  xchg	ah,al
+  mov	edi,vt_row+2
+  call	quick_ascii
+  mov	ecx,vt100_end - vt100_cursor
+  mov	esi,vt100_cursor
+  pop	edi
+  rep	movsb
+  pop	edx
+  pop	ecx
+  pop	ebx
+  pop	esi
+  ret
+;-------------------------------------
+; input: al=ascii
+;        edi=stuff end point
+quick_ascii:
+  push	byte 10
+  pop	ecx
+  and	eax,0ffh		;isolate al
+to_entry:
+  xor	edx,edx
+  div	ecx
+  or	dl,30h
+  mov	byte [edi],dl
+  dec	edi  
+  or	eax,eax
+  jnz	to_entry
+  ret
+;---------------------------------------------
+  [section .data]
+vt100_cursor:
+  db	1bh,'['
+vt_row:
+  db	'000'		;row
+  db	';'
+vt_column:
+  db	'000'		;column
+  db	'H'
+vt100_end:
+  
+ [section .text]
+ 
+;------------------------------------------------
+  [section .data]
+
+color_buf	times 20 db 0
+
+  [section .text]
+
+%ifdef DEBUG
+
+msg1	db	'red char on white blinking',0ah,0
+msg2	db	'normal white char on black',0ah,0
+  
+ [section .text]
+
+ global	_start
+_start:
+  mov	edx,blink+red_char+on_white
+  call	show_color
+  mov	ecx,msg1
+  call	crt_str
+  mov	edx,normal_color+white_char+on_black
+  call	show_color
+  mov	ecx,msg2
+  call	crt_str
+  mov	eax,1
+  int	80h
+
+%endif

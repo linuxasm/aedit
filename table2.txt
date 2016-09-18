@@ -1,0 +1,95 @@
+ dd 00000000	;20 SP    (Space)
+ dd 00000000	;21  !    (exclamation mark)
+ dd 00000000	;22  "    (double quote)
+ dd 00000000	;23  #    (number sign)
+ dd 00000000	;24  $    (dollar sign)
+ dd 00000000	;25  %    (percent)
+ dd 00000000	;26  &    (ampersand)
+ dd 00000000	;27  '    (single quote)
+ dd 00000000	;28  (    (left opening parenthesis)
+ dd 00000000	;29  )    (right closing parenthesis)
+ dd 00000000	;2A  *    (asterisk)
+ dd 00000000	;2B  +    (plus)
+ dd 00000000	;2C  ,    (comma)
+ dd 00000000	;2D  -    (minus or dash)
+ dd 00000000	;2E  .    (dot)
+ dd 00000000	;2F  /    (forward slash)
+ dd 00000000	;30  0
+ dd 00000000	;31  1
+ dd 00000000	;32  2
+ dd 00000000	;33  3
+ dd 00000000	;34  4
+ dd 00000000	;35  5
+ dd 00000000	;36  6
+ dd 00000000	;37  7
+ dd 00000000	;38  8
+ dd 00000000	;39  9
+ dd 00000000	;3A  :    (colon)
+ dd 00000000	;3B  ;    (semi-colon)
+ dd 00000000	;3C  <    (less than sign)
+ dd 00000000	;3D  =    (equal sign)
+ dd 00000000	;3E  >    (greater than sign)
+ dd 00000000	;3F  ?    (question mark)
+ dd 00000000	;40  @    (AT symbol)
+ dd 00000000	;41  A
+ dd 00000000	;42  B
+ dd 00000000	;43  C
+ dd 00000000	;44  D
+ dd 00000000	;45  E
+ dd 00000000	;46  F
+ dd 00000000	;47  G
+ dd 00000000	;48  H
+ dd 00000000	;49  I
+ dd 00000000	;4A  J
+ dd 00000000	;4B  K
+ dd 00000000	;4C  L
+ dd 00000000	;4D  M
+ dd 00000000	;4E  N
+ dd 00000000	;4F  O
+ dd 00000000	;50  P
+ dd 00000000	;51  Q
+ dd 00000000	;52  R
+ dd 00000000	;53  S
+ dd 00000000	;54  T
+ dd 00000000	;55  U
+ dd 00000000	;56  V
+ dd 00000000	;57  W
+ dd 00000000	;58  X
+ dd 00000000	;59  Y
+ dd 00000000	;5A  Z
+ dd 00000000	;5B  [    (left opening bracket)
+ dd 00000000	;5C  \    (back slash)
+ dd 00000000	;5D  ]    (right closing bracket)
+ dd 00000000	;5E  ^    (caret cirumflex)
+ dd 00000000	;5F  _    (underscore)
+ dd 00000000	;60  `
+ dd 00000000	;61  a
+ dd 00000000	;62  b
+ dd 00000000	;63  c
+ dd 00000000	;64  d
+ dd 00000000	;65  e
+ dd 00000000	;66  f
+ dd 00000000	;67  g
+ dd 00000000	;68  h
+ dd 00000000	;69  i
+ dd 00000000	;6A  j
+ dd 00000000	;6B  k
+ dd 00000000	;6C  l
+ dd 00000000	;6D  m
+ dd 00000000	;6E  n
+ dd 00000000	;6F  o
+ dd 00000000	;70  p
+ dd 00000000	;71  q
+ dd 00000000	;72  r
+ dd 00000000	;73  s
+ dd 00000000	;74  t
+ dd 00000000	;75  u
+ dd 00000000	;76  v
+ dd 00000000	;77  w
+ dd 00000000	;78  x
+ dd 00000000	;79  y
+ dd 00000000	;7A  z
+ dd 00000000	;7B  {    (left opening brace)
+ dd 00000000	;7C  |    (vertical bar)
+ dd 00000000	;7D  }    (right closing brace)
+ dd 00000000	;7E  ~    (tilde)

@@ -1,0 +1,662 @@
+  [section .text]
+;---------------------
+; decode_key - look up processing for this key
+;  input - kbuf - has char zero terminated
+;  output - ecx = ptr to processing or zero if no match
+;           eax,ebx modified
+decode_key:
+  call	lookup_key
+  jcxz	dk_end		;exit if no match
+  mov	eax,ecx		;save index in -eax-
+  mov	ecx,[key_mode] 	;get mode
+  mov	ebx,cmd_index_tbl-1 ;we must be in cmd mode
+  jecxz	dk3		;jmp if cmd mode
+  mov	ebx,edit_index_tbl-1
+;  dec	ecx
+;  jecxz	dk3		;jmp if edit mode
+;  mov	ebx,view_index_tbl-1
+dk3:
+  add	ebx,eax		;index into table
+  xor	eax,eax
+  mov	byte al,[ebx]	;get byte index to processing
+  cmp	eax,0		;check if no process for this key
+  jne	dk4		;jmp if process found
+  sub	ecx,ecx
+  jmp	dk_end
+dk4:
+  shl	eax,2		;convert to dword index
+  mov	ecx,process_adr_tbl -4
+  add	ecx,eax
+dk_end:	ret
+;********************************** decode logic ********************
+; lookup_key - scan key strings looking for match
+;   ecx - index if found, 0 if not found
+;
+lookup_key:
+  mov	esi,keystring_tbl
+  xor	ecx,ecx
+k1:	mov	edi,kbuf
+  mov	al,byte [edi]		;get kbuf entry
+  cmp	al,byte [esi]		;compare to keystring
+  je	k4			;initial char. match
+k2:	inc	esi
+k3:	cmp	byte [esi],0		;end of tbl entry
+  jne	k2			;loop if not end of tbl str
+k3a:	inc	esi
+  inc	ecx
+  cmp	byte [esi],0		;check if end of table
+  jne	k1			;jmp if more strings
+  xor	ecx,ecx			;flag no match
+  jmp	k6
+;
+; we have a match
+;
+k4:	inc	esi
+  inc	edi
+  mov	al,byte [edi]		;get next kbuf entry
+  cmp	byte [esi],al		;match?
+  jne	k3			;jmp if no match
+  cmp	al,0			;end of kbuf string
+  je	k5			;jmp if match at zero in both
+  cmp	byte [esi],0		;end of table string
+  jne	k4			;keep comparing if more data
+;
+; are we at end of this string
+
+  jmp	k3a		
+k5:	inc	ecx			;point ecx at match
+k6:	ret
+;---------------------
+  [section .data]
+
+; the keystring_tbl is seached after user presses a key.  Each
+; key press can generate up to 5 bytes of information and this
+; table is searched to find what key it is.  The match location
+; is used as an index into the next set of tables which point
+; at the process to call.
+
+keystring_tbl:
+  db 1bh,0			;1 esc
+  db 1bh,5bh,31h,31h,7eh,0	;2 f1
+  db 1bh,5bh,31h,32h,7eh,0	;3 f2
+  db 1bh,5bh,31h,33h,7eh,0	;4 f3
+  db 1bh,5bh,31h,34h,7eh,0	;5 f4
+  db 1bh,5bh,31h,35h,7eh,0	;6 f5
+  db 1bh,5bh,31h,37h,7eh,0	;7 f6
+  db 1bh,5bh,31h,38h,7eh,0	;8 f7
+  db 1bh,5bh,31h,39h,7eh,0	;9 f8
+  db 1bh,5bh,32h,30h,7eh,0	;10 f9
+  db 1bh,5bh,32h,31h,7eh,0	;11 f10
+  db 1bh,5bh,32h,33h,7eh,0	;12 f11
+  db 1bh,5bh,32h,34h,7eh,0	;13 f12
+  db 1bh,5bh,48h,0		;14 pad_home
+  db 1bh,5bh,41h,0		;15 pad_up
+  db 1bh,5bh,35h,7eh,0		;16 pad_pgup
+  db 1bh,5bh,44h,0		;17 pad_left
+  db 1bh,5bh,43h,0		;18 pad_right
+  db 1bh,5bh,46h,0		;19 pad_end
+  db 1bh,5bh,42h,0		;20 pad_down
+  db 1bh,5bh,36h,7eh,0		;21 pad_pgdn
+  db 1bh,5bh,32h,7eh,0		;22 pad_ins
+  db 1bh,5bh,33h,7eh,0		;23 pad_del
+  db 7fh,0			;24 backspace
+  db 1ah,0			;25 ctrl_z
+  db 01h,0			;26 ctrl_a
+  db 60h,0			;27 lquote
+  db 7eh,0			;28 ~
+  db 09h,0			;29 tab
+  db 40h,0			;30 @
+  db 23h,0			;31 #
+  db 24h,0			;32 $
+  db 25h,0			;33 %
+  db 5eh,0			;34 ^
+  db 26h,0			;35 &
+  db 2ah,0			;36 *
+  db 28h,0			;37 (
+  db 29h,0			;38 )
+  db 5fh,0			;39 _ underscore
+  db 2bh,0			;40 +
+  db 31h,0			;41 1
+  db 32h,0			;42 2
+  db 33h,0			;43 3
+  db 34h,0			;44 4
+  db 35h,0			;45 5
+  db 36h,0			;46 6
+  db 37h,0			;47 7
+  db 38h,0			;48 8
+  db 39h,0			;49 9
+  db 30h,0			;50 0
+  db 2dh,0			;51 - dash
+  db 3dh,0			;52 =
+  db 'q',0			;53 q
+  db "w",0			;54 w
+  db "e",0			;55 e
+  db "r",0			;56 r
+  db "t",0			;57 t
+  db "y",0			;58 y
+  db "u",0			;59 u
+  db "i",0			;60 i
+  db "o",0			;61 o
+  db "p",0			;62 p
+  db "[",0			;63 [
+  db "]",0			;64 ]
+  db "\",0			;65 \ nasm -can't accept \ at end of line
+  db 'Q',0		;66
+  db 'W',0		;67
+  db 'E',0		;68
+  db 'R',0		;69
+  db 'T',0		;70
+  db 'Y',0		;71
+  db 'U',0		;72
+  db 'I',0		;73
+  db 'O',0		;74
+  db 'P',0		;75
+  db '{',0		;76
+  db '}',0		;77
+  db '|',0		;78
+  db 'a',0		;79
+  db 's',0		;80
+  db 'd',0		;81
+  db 'f',0		;82
+  db 'g',0		;83
+  db 'h',0		;84
+  db 'j',0		;85
+  db 'k',0		;86
+  db 'l',0		;87
+  db ';',0		;88
+  db 27h,0		;89 single quote 
+  db 0dh,0		;90  enter 
+  db 'A',0		;91
+  db 'S',0		;92
+  db 'D',0		;93
+  db 'F',0		;94
+  db 'G',0		;95
+  db 'H',0		;96
+  db 'J',0		;97
+  db 'K',0		;98
+  db 'L',0		;99
+  db ':',0		;100
+  db 22h,0		;101 double quote
+  db 'z',0		;102
+  db 'x',0			;103
+  db 'c',0			;104
+  db 'v',0			;105
+  db 'b',0			;106
+  db 'n',0			;107
+  db 'm',0			;108
+  db ',',0			;109
+  db '.',0			;110
+  db '/',0			;111
+  db 'Z',0			;112
+  db 'X',0			;113
+  db 'C',0			;114
+  db 'V',0			;115
+  db 'B',0			;116
+  db 'N',0			;117
+  db 'M',0			;118
+  db '<',0			;119
+  db '>',0			;120
+  db '?',0			;121
+  db ' ',0			;122 space
+; the above are vt100, next is xterm unique keys
+  db 1bh,4fh,50h,0		;123 F1
+  db 1bh,4fh,51h,0		;123 F2
+  db 1bh,4fh,52h,0		;123 F3
+  db 1bh,4fh,53h,0		;123 F4
+;the above are xterm unique, next is linux-console unique
+  db 1bh,5bh,5bh,41h,0		;127 F1
+  db 1bh,5bh,5bh,42h,0		;128 f2
+  db 1bh,5bh,5bh,43h,0		;129 f3
+  db 1bh,5bh,5bh,44h,0		;130 f4
+  db 1bh,5bh,5bh,45h,0		;131 f5
+  db 0ah,0			;132 enter
+  db 03h,0			;133 ctrl-c
+  db 18h,0			;134 ctrl-x
+  db 15h,0                      ;135 ctrl-u
+  db 12h,0			;136 ctrl-r
+  db 21h,0			;137 explamation point
+  db 1bh,5bh,31h,7eh,0		;138 home (non-keypad)
+  db 1bh,5bh,34h,7eh,0		;139 end (non-keypad)
+  db 08,0			;140 backspace
+  db 1bh,4fh,78h,0		;141 pad_up
+  db 1bh,4fh,79h,0		;142 pad_pgup
+  db 1bh,4fh,74h,0		;143 pad_left
+  db 1bh,4fh,76h,0		;144 pad_right
+  db 1bh,4fh,71h,0		;145 pad_end
+  db 1bh,4fh,72h,0		;146 pad_down
+  db 1bh,4fh,73h,0		;147 pad_pgdn
+  db 1bh,4fh,70h,0		;148 pad_ins
+  db 1bh,4fh,6eh,0		;149 pad_del
+  db 1bh,4fh,77h,0		;150 pad_home
+  db 1bh,4fh,42h,0		;151 pad down
+  db 1bh,4fh,41h,0		;152 pad up
+  db 1bh,4fh,43h,0		;153 pad right
+  db 1bh,4fh,44h,0		;154 pad left
+  db 1bh,4fh,48h,0		;155 pad home
+  db 1bh,4fh,46h,0		;156 pad end
+  db 0		;end of table
+;
+;
+; command mode uses this table to convert keystrokes into actions
+;
+cmd_index_tbl:
+  db 00	;'esc',0	;1 -
+  db 59	;'f1',0		;2 - help
+  db 47	;'f2',0		;3 - main menu
+  db 50	;'f3',0		;4 - make/compiler
+  db 51	;'f4',0		;5 - debugger
+  db 79	;'f5',0		;6 - user defined
+  db 80	;'f6',0		;7 - user def
+  db 81	;'f7',0		;8
+  db 82	;'f8',0		;9
+  db 83	;'f9',0		;10
+  db 84	;'f10',0	;11
+  db 85	;'f11',0	;12
+  db 86	;'f12',0	;13
+  db 10	;'home',0	;14 - KeyHome
+  db 11	;'up',0		;15 - KeyUp
+  db 12	;'pgup',0	;16 - KeyPgUp
+  db 13	;'left',0	;17 - KeyLeft
+  db 14	;'right',0	;18 - KeyRight
+  db 15	;'end',0	;19 - KeyEnd
+  db 16	;'down',0	;20 - KeyDown
+  db 17	;'pgdn',0	;21 - KeyPgDn
+  db 18	;'ins',0	;22 - KeyIns
+  db 19	;'del',0	;23 - KeyDel
+  db 30	;'backspace',0	;24 - KeyDell
+  db 31	;'ctrl_z',0	;25 - delete_line
+  db 34	;'ctrl_a',0	;26 - delete_right
+  db 00	;'lquote',0	;27
+  db 00	;'~',0		;28
+  db 07	;'tab',0	;29 tab
+  db 00	;'@',0		;30
+  db 00	;'#',0		;31
+  db 00	;'$',0		;32
+  db 00	;'%',0		;33
+  db 00	;'^',0		;34
+  db 00	;'&',0		;35
+  db 00	;'*',0		;36
+  db 00	;'(',0		;37
+  db 00	;')',0		;38
+  db 00	;'_',0		;39
+  db 20	;'+',0		;40 m_find_fwd
+  db 00	;'1',0		;41
+  db 00	;'2',0		;42
+  db 00	;'3',0		;43
+  db 00	;'4',0		;44
+  db 00	;'5',0		;45
+  db 00	;'6',0		;46
+  db 00	;'7',0		;47
+  db 00	;'8',0		;48
+  db 00	;'9',0		;49
+  db 00	;'0',0		;50
+  db 69	;'-',0		;51 -  find backwards
+  db 00	;'=',0		;52
+  db 02	;'q',0		;53 - exit menu + calculator? quit_menu
+  db 01	;'w',0		;54 - toggle window state
+  db 06	;'e',0		;55 - execute macro
+  db 78	;'r',0		;56 - find & replace
+  db 71	;'t',0		;57 - set tag
+  db 00	;'y',0		;58
+  db 00	;'u',0		;59
+  db 74	;'i',0		;60 - enter exchange mode
+  db 07	;'o',0		;61 - other window
+  db 62	;'p',0		;62 - paragraph
+  db 00	;'[',0		;63
+  db 00	;']',0		;64
+  db 00	;'\',0		;65
+  db 39	;'Q',0		;66
+  db 42	;'W',0		;67
+  db 03	;'E',0		;68
+  db 21	;'R',0		;69 find and replace
+  db 41	;'T',0		;70
+  db 44	;'Y',0		;71
+  db 04	;'U',0		;72
+  db 29	;'I',0		;73
+  db 37	;'O',0		;74
+  db 38	;'P',0		;75
+  db 00	;'{',0		;76
+  db 00	;'}',0		;77
+  db 00	;'|',0		;78
+  db 70	;'a',0		;79 - again -repeat last find
+  db 00	;'s',0		;80
+  db 76	;'d',0		;81 - delete block
+  db 68	;'f',0		;82 - find forward- find
+  db 77	;'g',0		;83 -  (insert file) - 
+  db 59	;'h',0		;84 - KeyHelp
+  db 67	;'j',0		;85 - jump menu
+  db 00	;'k',0		;86
+  db 00	;'l',0		;87
+  db 00	;';',0		;88
+  db 00	;'rquote',0	;89 single quote 
+  db 00	;'enter',0	;90  enter 
+  db 00	;'A',0		;91
+  db 40	;'S',0		;92
+  db 26	;'D',0		;93
+  db 22	;'F',0		;94
+  db 27	;'G',0		;95
+  db 28	;'H',0		;96
+  db 32	;'J',0		;97
+  db 23	;'K',0		;98 m_find_back
+  db 32	;'L',0		;99
+  db 00	;':',0		;100
+  db 00	;double-quote,0	;101 double quote
+  db 00	;'z',0		;102
+  db 73	;'x',0		;103 - enter xchange mode
+  db 60	;'c',0		;104 - calculator
+  db 00	;'v',0		;105
+  db 48	;'b',0		;106 - mark_block - mark buffer
+  db 00	;'n',0		;107
+  db 05	;'m',0		;108 - macro record
+  db 00	;'comma',0	;109
+  db 00	;'period',0	;110
+  db 00	;'/',0		;111
+  db 45	;'Z',0		;112
+  db 43	;'X',0		;113
+  db 25	;'C',0		;114
+  db 08	;'V',0		;115
+  db 24	;'B',0		;116
+  db 09	;'N',0		;117
+  db 36	;'M',0		;118
+  db 46	;'<',0		;119
+  db 00	;'>',0		;120
+  db 00	;'?',0		;121
+  db 46	;'space',0	;122 space - main menu 
+; the above are vt100, next is xterm unique keys
+  db 59	;'f1',0		;123 F1 - help
+  db 47	;'f2',0		;124 F2
+  db 50	;'f3',0		;125 F3
+  db 51	;'f4',0		;126 F4
+;the above are xterm unique, next is linux-console unique
+  db 59	;'f1',0		;127 F1
+  db 47	;'f2',0		;128 f2
+  db 50	;'f3',0		;129 f3
+  db 51	;'f4',0		;130 f4
+  db 79	;'f5',0		;131 f5
+;appended keys
+  db 00	;'enter',0	;132 enter
+  db 00 ;'ctrl-c',0	;133 ctrl-c
+  db 35 ;'ctrl-x',0	;134 ctrl-x
+  db 49 ; ctrl-u	;135 ctrl-u
+  db 61 ; ctrl-r	;136 ctrl-r hex in
+  db 00 ; explamation   ;137 explamation
+  db 10 ; home		;138
+  db 15	; end  		;139
+  db 30 ; backspace	;140 08h=backspace
+  db 11	;'up',0		;141 - KeyUp
+  db 12	;'pgup',0	;142 - KeyPgUp
+  db 13	;'left',0	;143 - KeyLeft
+  db 14	;'right',0	;144 - KeyRight
+  db 15	;'end',0	;145 - KeyEnd
+  db 16	;'down',0	;146 - KeyDown
+  db 17	;'pgdn',0	;147 - KeyPgDn
+  db 18	;'ins',0	;148 - KeyIns
+  db 19	;'del',0	;149 - KeyDel
+  db 10	;'home',0	;150 - KeyHome
+  db 16 ;               ;151 - KeyDown
+  db 11 ;               ;152 - KeyUP
+  db 14 ;		;153 - KeyRight
+  db 13 ;		;154 - KeyLeft
+  db 10 ;		;155 - home
+  db 15 ;		;156 - end
+;
+; edit mode uses this table to convert key presses into actions.
+; each possible key press has associated action.  Raw data can be
+;  processed with control-r command.
+;  
+edit_index_tbl:
+  db 72	;'esc',0	;1
+  db 59	;'f1',0		;2
+  db 47	;'f2',0		;3
+  db 50	;'f3',0		;4
+  db 51	;'f4',0		;5
+  db 79	;'f5',0		;6
+  db 60	;'f6',0		;7
+  db 81	;'f7',0		;8
+  db 82	;'f8',0		;9
+  db 83	;'f9',0		;10
+  db 84	;'f10',0	;11
+  db 85	;'f11',0	;12
+  db 86	;'f12',0	;13
+  db 10	;'home',0	;14 - KeyHome
+  db 11	;'up',0		;15 - KeyUp
+  db 12	;'pgup',0	;16 - KeyPgUp
+  db 13	;'left',0	;17 - KeyLeft
+  db 14	;'right',0	;18 - KeyRight
+  db 15	;'end',0	;19 - KeyEnd
+  db 16	;'down',0	;20 - KeyDown
+  db 17	;'pgdn',0	;21 - KeyPgDn
+  db 18	;'ins',0	;22 - KeyIns
+  db 19	;'del',0	;23 - KeyDel
+  db 30	;'backspace',0	;24 - KeyDell
+  db 31	;'ctrl_z',0	;25 - delete_line
+  db 34	;'ctrl_a',0	;26 - delete_right
+  db 63	;'lquote',0	;27
+  db 63	;'~',0		;28
+  db 63	;'tab',0	;29 tab
+  db 63	;'@',0		;30
+  db 63	;'#',0		;31
+  db 63	;'$',0		;32
+  db 63	;'%',0		;33
+  db 63	;'^',0		;34
+  db 63	;'&',0		;35
+  db 63	;'*',0		;36
+  db 63	;'(',0		;37
+  db 63	;')',0		;38
+  db 63	;'_',0		;39
+  db 63	;'+',0		;40
+  db 63	;'1',0		;41
+  db 63	;'2',0		;42
+  db 63	;'3',0		;43
+  db 63	;'4',0		;44
+  db 63	;'5',0		;45
+  db 63	;'6',0		;46
+  db 63	;'7',0		;47
+  db 63	;'8',0		;48
+  db 63	;'9',0		;49
+  db 63	;'0',0		;50
+  db 63	;'-',0		;51
+  db 63	;'=',0		;52
+  db 63	;'q',0		;53
+  db 63	;'w',0		;54
+  db 63	;'e',0		;55
+  db 63	;'r',0		;56
+  db 63	;'t',0		;57
+  db 63	;'y',0		;58
+  db 63	;'u',0		;59
+  db 63	;'i',0		;60
+  db 63	;'o',0		;61
+  db 63	;'p',0		;62
+  db 63	;'[',0		;63
+  db 63	;']',0		;64
+  db 63	;'\',0		;65
+  db 63	;'Q',0		;66
+  db 63	;'W',0		;67
+  db 63	;'E',0		;68
+  db 63	;'R',0		;69
+  db 63	;'T',0		;70
+  db 63	;'Y',0		;71
+  db 63	;'U',0		;72
+  db 63	;'I',0		;73
+  db 63	;'O',0		;74
+  db 63	;'P',0		;75
+  db 63	;'{',0		;76
+  db 63	;'}',0		;77
+  db 63	;'|',0		;78
+  db 63	;'a',0		;79
+  db 63	;'s',0		;80
+  db 63	;'d',0		;81
+  db 63	;'f',0		;82
+  db 63	;'g',0		;83
+  db 63	;'h',0		;84
+  db 63	;'j',0		;85
+  db 63	;'k',0		;86
+  db 63	;'l',0		;87
+  db 63	;';',0		;88
+  db 63	;'rquote',0	;89 single quote 
+  db 63	;'enter',0	;90  enter 
+  db 63	;'A',0		;91
+  db 63	;'S',0		;92
+  db 63	;'D',0		;93
+  db 63	;'F',0		;94
+  db 63	;'G',0		;95
+  db 63	;'H',0		;96
+  db 63	;'J',0		;97
+  db 63	;'K',0		;98
+  db 63	;'L',0		;99
+  db 63	;':',0		;100
+  db 63	;double-quote,0	;101 double quote
+  db 63	;'z',0		;102
+  db 63	;'x',0		;103
+  db 63	;'c',0		;104
+  db 63	;'v',0		;105
+  db 63	;'b',0		;106
+  db 63	;'n',0		;107
+  db 63	;'m',0		;108
+  db 63	;'comma',0	;109
+  db 63	;'period',0	;110
+  db 63	;'/',0		;111
+  db 63	;'Z',0		;112
+  db 63	;'X',0		;113
+  db 63	;'C',0		;114
+  db 63	;'V',0		;115
+  db 63	;'B',0		;116
+  db 63	;'N',0		;117
+  db 63	;'M',0		;118
+  db 63	;'<',0		;119
+  db 63	;'>',0		;120
+  db 63	;'?',0		;121
+  db 63	;'space',0	;122 space
+; the above are vt100, next is xterm unique keys
+  db 59	;'f1',0		;123 F1 - help
+  db 47	;'f2',0		;124 F2
+  db 50	;'f3',0		;125 F3
+  db 51	;'f4',0		;126 F4
+;the above are xterm unique, next is linux-console unique
+  db 59	;'f1',0		;127 F1
+  db 47	;'f2',0		;128 f2
+  db 50	;'f3',0		;129 f3
+  db 51	;'f4',0		;130 f4
+  db 79	;'f5',0		;131 f5
+;appended keys  
+  db 63	;'enter',0	;132 enteri
+  db 00 ;'ctrl-c',0	;133 ctrl-c
+  db 35 ;'ctrl-x',0	;134 ctrl-x
+  db 49 ; ctrl-u	;135 ctrl-u
+  db 61 ; ctrl-r	;136 ctrl-r  -hex in
+  db 63 ; explamation   ;137 explamation  
+  db 10 ; home		;138
+  db 15	; end  		;139
+  db 30 ; backspace     ;140
+  db 11	;'up',0		;141 - KeyUp
+  db 12	;'pgup',0	;142 - KeyPgUp
+  db 13	;'left',0	;143 - KeyLeft
+  db 14	;'right',0	;144 - KeyRight
+  db 15	;'end',0	;145 - KeyEnd
+  db 16	;'down',0	;146 - KeyDown
+  db 17	;'pgdn',0	;147 - KeyPgDn
+  db 18	;'ins',0	;148 - KeyIns
+  db 19	;'del',0	;149 - KeyDel
+  db 10	;'home',0	;150 - KeyHome
+  db 16 ;               ;151 - KeyDown
+  db 11 ;               ;152 - KeyUP
+  db 14 ;		;153 - KeyRight
+  db 13 ;		;154 - KeyLeft
+  db 10 ;		;155 - home
+  db 15 ;		;156 - end
+;
+; all keyboard routines are listed here for attachment
+; to keys.  See tables above for pointers (index) to
+; these routines.  A zero indicates this is unused
+; entry, otherwise a process address is specified.
+
+process_adr_tbl:
+  dd window    	;01 w - toggle window state
+  dd quit_menu	;02 q
+  dd m_exit    	;03  - save & exit
+  dd m_update  	;04 save file
+  dd macro_record_toggle ;05 enable/disable macro record
+  dd macro_execute_menu	;06  execute macro
+  dd other     	;07  switch buffers
+  dd m_write	;08  save file as
+  dd m_newfile	;09 QI init new file
+  dd KeyHome	;10
+  dd key_up	;11
+  dd KeyPgUp	;12
+  dd key_left	;13
+  dd key_right	;14
+  dd KeyEnd	;15
+  dd key_down	;16
+  dd KeyPgDn	;17
+  dd KeyIns	;18
+  dd KeyDel	;19 ;was ^g ws
+  dd m_find_fwd ;20
+  dd m7_replace	;21
+  dd m7mode	;22 find menu
+  dd m_find_back ;23
+  dd m8mode	;24 block menu
+  dd m5_calc	;25
+  dd m8_dblock  ;26
+  dd m8_getblock ;27
+  dd m10mode	;28 help menu
+  dd m6_insert  ;29
+  dd KeyDell	;30 ^h pico ^h emac ^h ws - del char left
+  dd delete_line ;31 
+  dd m4mode	;32 jump menu
+  dd m4_line	;33 jump to line
+  dd delete_right ;34 delete to end of line
+  dd delete_left ;35 - delete to begining of line
+  dd m5mode	;36 misc menu
+  dd m3_other	;37 
+  dd m5_paragraph ;38
+  dd m2mode	;39 quit menu
+  dd m9mode	;40 setup menu
+  dd m6mode	;41 edit menu
+  dd m3mode    	;42 window menu
+  dd m6_overtype ;43
+  dd m8_get	 ;44
+  dd m_abort	;45
+  dd m1mode	;46 main menu
+  dd f2_todo	;47 KeyEmaCtrlY  - yank (paste)
+  dd mark_block	;48 mark_block
+  dd restore_line ;49
+  dd f_make     ;50
+  dd f_bug     	;51
+  dd 0      	;52
+  dd 0        	;53
+  dd 0     	;54
+  dd 0   	;55
+  dd 0         	;56	;help pgdn
+  dd 0     	;57	;help pgup
+  dd 0         	;58
+  dd KeyHelp	;59 f1 - help
+  dd calc	;60  calculator
+  dd hex_input	;61 ^r hex input
+  dd paragraph 	;62 paragraph (p)
+  dd NormChar	;63 tab, space, etc. - insert into buffer
+  dd 00		;64 KeySuspend	 
+  dd 00         ;65
+  dd 0   	;66
+  dd jump_menu	;67  j jump - aedit jump menu 
+  dd find_forward ;68 f find - aedit find forward  
+  dd find_back	;69  - find - aedit find back
+  dd again	;70 - again for find,replace,macros
+  dd set_tag	;71 - set tag
+  dd set_cmd_mode ;72 - esc 
+  dd xchange_mode ;73 - enter exchange mode
+  dd insert_mode	;74 - enter insert mode
+  dd 0     	;75 -
+  dd dmark_block ;76 - mark delete block
+  dd get_file	;77 - get buffer or file
+  dd find_and_replace ;78 - find and replace text
+  dd key_f5	;79
+  dd key_f6	;80
+  dd key_f7	;81
+  dd key_f8	;82
+  dd key_f9	;83
+  dd key_fa	;84
+  dd key_fb	;85
+  dd key_fc	;86
+
+  [section .text]
+;-------------------------------------------------------

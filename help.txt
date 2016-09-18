@@ -1,0 +1,42 @@
+CMD mode keys
+  a - again		
+  b - block begin		
+  c - calc, or clip if ends block		
+  d - del block if ends block		
+  e - execute		
+  f - find		
+  g - get buffer,file,clipboard		
+  h - help		
+  i - insert mode	
+  j - jump menu		
+  k -                   
+  l -                   
+  m - macro             
+  n -                   
+  o - other window      
+  p - paragraph         
+  q - quit menu		
+  r - replace		
+  s -                   
+  t - tag               
+  u -                   
+  v -                   
+  w - window split      
+  x - overtype mode     
+  y -                   
+  z -                   
+(following keys work in all modes)                        
+  space = menu         F1 - help
+  ^c - abort operation F2 - 
+  esc - cmd mode       F3 - compile
+  ins - toggle x,i     F4 - 
+  tab other window     F5 - spell
+  -   find reverse     F6 - compar
+  ^a  delete right     F7 - print
+  ^x  delete left      F8 -
+  ^z  delete line      F9 -
+  ^u  restore line     F10 - quick exit
+  ^r  enter hex char   F11 -
+
+mouse left click - moves cursor or press button
+mouse right click - execute text under cursor
