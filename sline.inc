@@ -76,6 +76,16 @@ write_status_line:
 ;output: edi=data ptr
 ;        ecx=length
 stuff_decimal:
+;clear display area
+  push	eax
+  push	edi
+  push	ecx
+  mov	al,' '
+  rep	stosb
+  pop	ecx
+  pop	edi
+  pop	eax
+
   push	edi
   mov	edi,bakpath+8		;temp buffer
   mov	byte [edi],0		;put zero at end of data
@@ -232,6 +242,7 @@ set_block_color:
   mov	al,[crt_cursor]		;get column
   sub	al,byte [win_loc_col]
   add	eax,[crt_left_column]
+  inc	eax			;make column 0 -> 1
   mov	edi,column_stuff
   mov	ecx,3
   call	stuff_decimal		;stuff display column

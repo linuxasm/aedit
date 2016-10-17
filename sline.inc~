@@ -76,6 +76,16 @@ write_status_line:
 ;output: edi=data ptr
 ;        ecx=length
 stuff_decimal:
+;clear display area
+  push	eax
+  push	edi
+  push	ecx
+  mov	al,' '
+  rep	stosb
+  pop	ecx
+  pop	edi
+  pop	eax
+
   push	edi
   mov	edi,bakpath+8		;temp buffer
   mov	byte [edi],0		;put zero at end of data
@@ -394,9 +404,9 @@ m1_menu:
   db	'Block'
   db	1
 ;
-  dd	m9mode	;Setup
-  db	'Setup'
-  db	1
+;  dd	m9mode	;Setup
+;  db	'Setup'
+;  db	1
 ;
   dd	m10mode	;help
   db	'Help'
